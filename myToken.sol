@@ -3,10 +3,19 @@ pragma solidity ^0.8.6;
 
 contract MyToken {
     mapping(address => uint256) private _balances;
+    mapping(address => mapping(address => uint256)) private _allowances;
+
     string private _name;
     string private _symbol;
     uint8 private _decimals;
     uint256 private _totalSupply;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(
+        address indexed owner,
+        address indexed spender,
+        uint256 value
+    );
 
     constructor(
         uint256 initialSupply,
@@ -49,6 +58,22 @@ contract MyToken {
         _balances[account] = balance;
     }
 
+    function getAllowances(address owner, address spender)
+        public
+        view
+        returns (uint256)
+    {
+        return _allowances[owner][spender];
+    }
+
+    function setAllowances(
+        address owner,
+        address spender,
+        uint256 ammount
+    ) internal {
+        _allowances[owner][spender] = ammount;
+    }
+
     function transfer(address beneficiary, uint256 ammount)
         public
         returns (bool)
@@ -65,36 +90,46 @@ contract MyToken {
             _balances[beneficiary] + ammount > _balances[beneficiary],
             "Addition overflow"
         );
+        emit Transfer(msg.sender, beneficiary, ammount);
         _balances[msg.sender] -= ammount;
         _balances[beneficiary] += ammount;
         return true;
     }
 
-    // Parse function for uint to string
-    // Code from Stackoverflow https://stackoverflow.com/questions/47129173/how-to-convert-uint-to-string-in-solidity
-    function uint2str(uint256 _i)
-        internal
-        pure
-        returns (string memory _uintAsString)
-    {
-        if (_i == 0) {
-            return "0";
-        }
-        uint256 j = _i;
-        uint256 len;
-        while (j != 0) {
-            len++;
-            j /= 10;
-        }
-        bytes memory bstr = new bytes(len);
-        uint256 k = len;
-        while (_i != 0) {
-            k = k - 1;
-            uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
-            bytes1 b1 = bytes1(temp);
-            bstr[k] = b1;
-            _i /= 10;
-        }
-        return string(bstr);
+    function approve(address spender, uint256 ammount) public returns (bool) {
+        require(spender != address(0), "Spender address cannot be zero");
+        _allowances[msg.sender][spender] = ammount;
+        emit Approval(msg.sender, spender, ammount);
+        return true;
+    }
+
+    function transferFrom(
+        address sender,
+        address beneficiary,
+        uint256 ammount
+    ) public returns (bool) {
+        require(sender != address(0), "Spender address cannot be zero");
+        require(
+            beneficiary != address(0),
+            "Beneficiary address cannot be zero"
+        );
+        require(
+            ammount <= _allowances[sender][msg.sender],
+            "Allowance is not enough"
+        );
+        require(
+            _balances[sender] >= ammount,
+            "Sender do not have enough balance"
+        );
+        require(
+            _balances[beneficiary] + ammount > _balances[beneficiary],
+            "Addition overflow"
+        );
+
+        _balances[sender] -= ammount;
+        _allowances[sender][msg.sender] -= ammount;
+        _balances[beneficiary] += ammount;
+        emit Transfer(sender, beneficiary, ammount);
+        return true;
     }
 }
